@@ -1,1 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WB2 Sales Analyser</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:#0f0f0f;color:#e8e6e0;font-family:Arial,sans-serif;min-height:100vh;padding:0}
+header{background:#111;border-bottom:1px solid #2e2e2e;padding:1rem 2rem;display:flex;justify-content:space-between;align-items:center}
+header h1{font-family:monospace;font-size:1rem;color:#c8f05a;font-weight:500}
+header p{font-family:monospace;font-size:0.72rem;color:#888}
+.pill{font-family:monospace;font-size:0.7rem;padding:3px 10px;border-radius:20px;border:1px solid #888;color:#888;background:#222}
+.pill.running{color:#ffd166;border-color:#ffd166}
+.pill.done{color:#4ecdc4;border-color:#4ecdc4}
+.pill.error{color:#ff6b6b;border-color:#ff6b6b}
+main{display:grid;grid-template-columns:360px 1fr;gap:0;min-height:calc(100vh - 57px)}
+.sidebar{background:#111;border-right:1px solid #2e2e2e;padding:1.5rem;overflow-y:auto}
+.content{padding:1.5rem;overflow-y:auto}
+.section{margin-bottom:1.5rem}
+.section-title{font-family:monospace;font-size:0.72rem;color:#c8f05a;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.8rem;display:flex;align-items:center;gap:6px}
+.step-badge{background:rgba(200,240,90,0.1);color:#c8f05a;font-size:0.65rem;padding:2px 6px;border-radius:3px}
+.upload-zone{border:1.5px dashed #3a3a3a;border-radius:6px;padding:1rem;text-align:center;cursor:pointer;background:#181818;transition:all 0.2s;position:relative;margin-bottom:8px}
+.upload-zone:hover{border-color:#c8f05a;background:rgba(200,240,90,0.03)}
+.upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.upload-zone .uz-label{font-size:0.78rem;color:#888}
+.upload-zone .uz-hint{font-size:0.68rem;color:#555;margin-top:3px;font-family:monospace}
+.upload-zone.has-files{border-color:#c8f05a;background:rgba(200,240,90,0.03)}
+.file-count{font-family:monospace;font-size:0.72rem;color:#c8f05a;margin-top:4px}
+label.field-label{display:block;font-family:monospace;font-size:0.7rem;color:#888;margin-bottom:4px;margin-top:10px}
+input[type=text]{width:100%;background:#181818;border:1px solid #2e2e2e;border-radius:5px;padding:7px 10px;color:#e8e6e0;font-family:monospace;font-size:0.78rem;outline:none}
+input[type=text]:focus{border-color:#c8f05a}
+.hint-text{font-family:monospace;font-size:0.65rem;color:#555;margin-top:3px}
+.run-btn{width:100%;margin-top:1.25rem;padding:11px;background:#c8f05a;color:#0f0f0f;border:none;border-radius:6px;font-family:monospace;font-size:0.85rem;font-weight:bold;cursor:pointer;letter-spacing:0.05em;transition:background 0.2s}
+.run-btn:hover:not(:disabled){background:#a8cc3a}
+.run-btn:disabled{background:#3a3a3a;color:#666;cursor:not-allowed}
+.log-box{background:#0a0a0a;border:1px solid #2e2e2e;border-radius:5px;padding:10px;font-family:monospace;font-size:0.7rem;line-height:1.8;min-height:60px;max-height:150px;overflow-y:auto;margin-top:1rem;color:#888}
+.log-ok{color:#c8f05a}.log-err{color:#ff6b6b}.log-info{color:#888}
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1.25rem}
+.stat{background:#181818;border:1px solid #2e2e2e;border-radius:6px;padding:12px}
+.stat .sv{font-family:monospace;font-size:1.3rem;font-weight:500;color:#c8f05a}
+.stat .sl{font-family:monospace;font-size:0.65rem;color:#888;margin-top:4px}
+.table-wrap{overflow-x:auto;border:1px solid #2e2e2e;border-radius:6px;max-height:calc(100vh - 280px);overflow-y:auto}
+table{width:100%;border-collapse:collapse;font-family:monospace;font-size:0.75rem}
+thead tr{background:#1a1a1a;position:sticky;top:0;z-index:1}
+th{text-align:left;padding:9px 12px;color:#c8f05a;font-weight:500;border-bottom:1px solid #2e2e2e;white-space:nowrap;font-size:0.68rem;letter-spacing:0.04em;text-transform:uppercase}
+td{padding:7px 12px;border-bottom:1px solid #161616;white-space:nowrap;color:#e8e6e0}
+tr.total-row td{background:#1a1a1a;color:#c8f05a;font-weight:500;border-top:1px solid #2e2e2e;border-bottom:2px solid #2e2e2e}
+tr:hover:not(.total-row) td{background:rgba(255,255,255,0.02)}
+.empty-state{text-align:center;padding:4rem 1rem;color:#555;font-family:monospace;font-size:0.82rem}
+.empty-icon{font-size:2.5rem;display:block;margin-bottom:12px;opacity:0.3}
+.export-btn{padding:7px 16px;background:transparent;color:#c8f05a;border:1px solid #c8f05a;border-radius:5px;font-family:monospace;font-size:0.75rem;cursor:pointer;letter-spacing:0.04em;transition:background 0.2s;margin-left:8px}
+.export-btn:hover{background:rgba(200,240,90,0.08)}
+.export-btn:disabled{opacity:0.3;cursor:not-allowed}
+.output-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}
+.divider{border:none;border-top:1px solid #2e2e2e;margin:1rem 0}
+@media(max-width:900px){main{grid-template-columns:1fr}.sidebar{border-right:none;border-bottom:1px solid #2e2e2e}}
+</style>
+</head>
+<body>
 
+<header>
+  <div>
+    <h1>WB2_VBRK_VBRP — Sales Analyser</h1>
+    <p>Upload files → configure → get summary</p>
+  </div>
+  <div class="pill" id="pill">idle</div>
+</header>
+
+<main>
+  <!-- ── Sidebar ── -->
+  <div class="sidebar">
+
+    <!-- Sales Files -->
+    <div class="section">
+      <div class="section-title"><span class="step-badge">01</span> Monthly Sales Files</div>
+      <div class="upload-zone" id="dz-sales">
+        <input type="file" id="fi-sales" multiple accept=".xlsx,.xls,.XLSX,.XLS">
+        <div class="uz-label">Click to select Excel files</div>
+        <div class="uz-hint">.xlsx · multiple files OK</div>
+      </div>
+      <div class="file-count" id="sales-count"></div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- Master Files -->
+    <div class="section">
+      <div class="section-title"><span class="step-badge">02</span> Master Files</div>
+
+      <div class="upload-zone" id="dz-cust">
+        <input type="file" id="fi-cust" accept=".xlsx,.xls,.XLSX,.XLS">
+        <div class="uz-label">Customer Grouping file</div>
+        <div class="uz-hint">Customer_Code · Customer_Group</div>
+      </div>
+      <div class="file-count" id="cust-count"></div>
+
+      <div class="upload-zone" id="dz-mat" style="margin-top:8px">
+        <input type="file" id="fi-mat" accept=".xlsx,.xls,.XLSX,.XLS">
+        <div class="uz-label">Material Master file</div>
+        <div class="uz-hint">Material · Plant-sp.matl status</div>
+      </div>
+      <div class="file-count" id="mat-count"></div>
+
+      <div class="upload-zone" id="dz-mrp" style="margin-top:8px">
+        <input type="file" id="fi-mrp" accept=".xlsx,.xls,.XLSX,.XLS">
+        <div class="uz-label">MRP / Retail Price file</div>
+        <div class="uz-hint">Material · Retail Price · Wholesale Price · Currency · EAN/UPC</div>
+      </div>
+      <div class="file-count" id="mrp-count"></div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- Config -->
+    <div class="section">
+      <div class="section-title"><span class="step-badge">03</span> Configuration</div>
+
+      <label class="field-label">Exclude Billing Types (comma separated)</label>
+      <input type="text" id="exclude_types" value="ZF8, IV, IVS" placeholder="e.g. ZF8, IV, IVS">
+      <div class="hint-text">These billing types will be completely ignored</div>
+
+      <label class="field-label">Return Billing Types — sign flip (comma separated)</label>
+      <input type="text" id="flip_types" value="ZRE" placeholder="e.g. ZRE">
+      <div class="hint-text">Qty and values for these types will be flipped to negative</div>
+
+      <label class="field-label">FX Rate (local currency → USD)</label>
+      <input type="text" id="fx_rate" value="0.0522226441899265" placeholder="e.g. 0.0522226441899265">
+      <div class="hint-text">All values in summary will be converted to USD using this rate</div>
+    </div>
+
+    <button class="run-btn" id="runBtn" onclick="runAnalysis()">▶ RUN ANALYSIS</button>
+    <div class="log-box" id="logBox"><span class="log-info">› Upload files and click Run Analysis</span></div>
+
+  </div>
+
+  <!-- ── Main Content ── -->
+  <div class="content">
+    <div id="statsRow" class="stats-row" style="display:none">
+      <div class="stat"><div class="sv" id="s-customers">-</div><div class="sl">Customers</div></div>
+      <div class="stat"><div class="sv" id="s-netsales">-</div><div class="sl">Total Net Sales (USD)</div></div>
+      <div class="stat"><div class="sv" id="s-rows">-</div><div class="sl">Summary rows</div></div>
+    </div>
+
+    <div id="outputPanel">
+      <div class="empty-state">
+        <span class="empty-icon">⊡</span>
+        Summary will appear here after running the analysis.
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+var salesFiles = [], custFile = null, matFile = null, mrpFile = null;
+
+function setPill(s, col) {
+  var p = document.getElementById('pill');
+  p.textContent = s; p.className = 'pill ' + s;
+}
+
+function alog(msg, cls) {
+  var d = document.getElementById('logBox');
+  var s = document.createElement('div');
+  s.className = cls || 'log-info';
+  s.textContent = '› ' + msg;
+  d.appendChild(s);
+  d.scrollTop = d.scrollHeight;
+}
+function clog() { document.getElementById('logBox').innerHTML = ''; }
+
+function setFileZone(zoneId, countId, file, label) {
+  var zone = document.getElementById(zoneId);
+  var count = document.getElementById(countId);
+  zone.classList.add('has-files');
+  count.textContent = '✓ ' + (label || file.name);
+  count.style.color = '#c8f05a';
+}
+
+document.getElementById('fi-sales').onchange = function(e) {
+  salesFiles = Array.from(e.target.files);
+  var zone = document.getElementById('dz-sales');
+  var count = document.getElementById('sales-count');
+  zone.classList.add('has-files');
+  count.textContent = '✓ ' + salesFiles.length + ' file(s) selected';
+  count.style.color = '#c8f05a';
+  updateRunBtn();
+};
+
+document.getElementById('fi-cust').onchange = function(e) {
+  custFile = e.target.files[0];
+  setFileZone('dz-cust', 'cust-count', custFile);
+  updateRunBtn();
+};
+document.getElementById('fi-mat').onchange = function(e) {
+  matFile = e.target.files[0];
+  setFileZone('dz-mat', 'mat-count', matFile);
+  updateRunBtn();
+};
+document.getElementById('fi-mrp').onchange = function(e) {
+  mrpFile = e.target.files[0];
+  setFileZone('dz-mrp', 'mrp-count', mrpFile);
+  updateRunBtn();
+};
+
+function updateRunBtn() {
+  var ready = salesFiles.length > 0 && custFile && matFile && mrpFile;
+  var btn = document.getElementById('runBtn');
+  btn.disabled = !ready;
+  btn.style.background = ready ? '#c8f05a' : '#3a3a3a';
+  btn.style.color = ready ? '#0f0f0f' : '#666';
+  btn.style.cursor = ready ? 'pointer' : 'not-allowed';
+}
+
+async function runAnalysis() {
+  clog();
+  setPill('running');
+  document.getElementById('runBtn').disabled = true;
+  document.getElementById('statsRow').style.display = 'none';
+  document.getElementById('outputPanel').innerHTML = '<div class="empty-state"><span class="empty-icon" style="animation: spin 1s linear infinite; display:inline-block">⟳</span><br>Processing... this may take a moment for large files.</div>';
+
+  alog('Preparing files...', 'log-info');
+
+  var formData = new FormData();
+  salesFiles.forEach(function(f) { formData.append('sales_files', f); });
+  formData.append('cust_file', custFile);
+  formData.append('material_file', matFile);
+  formData.append('mrp_file', mrpFile);
+  formData.append('exclude_types', document.getElementById('exclude_types').value);
+  formData.append('flip_types', document.getElementById('flip_types').value);
+  formData.append('fx_rate', document.getElementById('fx_rate').value);
+
+  try {
+    var res = await fetch('/run', { method: 'POST', body: formData });
+    var data = await res.json();
+
+    if (!data.success) {
+      alog('Error: ' + data.error, 'log-err');
+      setPill('error');
+      document.getElementById('outputPanel').innerHTML = '<div class="empty-state"><span style="color:#ff6b6b;font-size:1.5rem">✕</span><br><span style="color:#ff6b6b">' + data.error + '</span></div>';
+      document.getElementById('runBtn').disabled = false;
+      return;
+    }
+
+    // Logs
+    data.logs.forEach(function(l) {
+      var cls = l.startsWith('  ✓') || l.includes('✓') ? 'log-ok' : 'log-info';
+      alog(l, cls);
+    });
+
+    // Stats
+    document.getElementById('s-customers').textContent = data.stats.customers;
+    document.getElementById('s-netsales').textContent = '$' + data.stats.net_sales.toLocaleString();
+    document.getElementById('s-rows').textContent = data.stats.total_rows;
+    document.getElementById('statsRow').style.display = 'grid';
+
+    // Table
+    renderTable(data.columns, data.rows);
+    setPill('done');
+    alog('Done!', 'log-ok');
+
+  } catch(err) {
+    alog('Network error: ' + err.message, 'log-err');
+    setPill('error');
+  }
+  document.getElementById('runBtn').disabled = false;
+}
+
+function renderTable(cols, rows) {
+  var html = '<div class="output-header">'
+    + '<span style="font-family:monospace;font-size:0.75rem;color:#888">Summary — ' + rows.length + ' rows</span>'
+    + '<div><button class="export-btn" onclick="exportCSV()">↓ Export CSV</button></div>'
+    + '</div>'
+    + '<div class="table-wrap"><table><thead><tr>';
+
+  cols.forEach(function(c) { html += '<th>' + c + '</th>'; });
+  html += '</tr></thead><tbody>';
+
+  rows.forEach(function(row) {
+    var isTotal = row[2] === 'Total';
+    html += '<tr' + (isTotal ? ' class="total-row"' : '') + '>';
+    row.forEach(function(cell, i) {
+      var val = cell === null || cell === undefined ? '' : cell;
+      if (typeof val === 'number') {
+        val = i === 3 ? val.toLocaleString() : '$' + val.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+      }
+      html += '<td>' + val + '</td>';
+    });
+    html += '</tr>';
+  });
+
+  html += '</tbody></table></div>';
+  document.getElementById('outputPanel').innerHTML = html;
+  window._tableData = { cols: cols, rows: rows };
+}
+
+function exportCSV() {
+  if (!window._tableData) return;
+  var cols = window._tableData.cols;
+  var rows = window._tableData.rows;
+  var csv = [cols.join(',')];
+  rows.forEach(function(row) {
+    csv.push(row.map(function(c) {
+      var v = c === null || c === undefined ? '' : String(c);
+      if (v.includes(',') || v.includes('"')) v = '"' + v.replace(/"/g, '""') + '"';
+      return v;
+    }).join(','));
+  });
+  var blob = new Blob([csv.join('\n')], { type: 'text/csv' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  var date = new Date().toISOString().split('T')[0].replace(/-/g, '');
+  a.download = 'WB2_Summary_' + date + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+updateRunBtn();
+</script>
+</body>
+</html>
